@@ -44,21 +44,11 @@ func (a *API) UpdateSource(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) GetPreflight(w http.ResponseWriter, r *http.Request) {
 	batchID := r.PathValue("batchID")
-	a.preflightMu.RLock()
-	preflight, cached := a.preflightCache[batchID]
-	a.preflightMu.RUnlock()
-	if cached {
-		writeJSON(w, http.StatusOK, preflight)
-		return
-	}
 	preflight, err := a.service.SubmissionPreflight(batchID)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	a.preflightMu.Lock()
-	a.preflightCache[batchID] = preflight
-	a.preflightMu.Unlock()
 	writeJSON(w, http.StatusOK, preflight)
 }
 

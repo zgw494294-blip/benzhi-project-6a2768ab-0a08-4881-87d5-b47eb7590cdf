@@ -2,20 +2,17 @@ package httpapi
 
 import (
 	"net/http"
-	"sync"
 
 	"seed-vault-admission/internal/admission"
 )
 
 type API struct {
-	service        *admission.Service
-	mux            *http.ServeMux
-	preflightMu    sync.RWMutex
-	preflightCache map[string]admission.SubmissionPreflight
+	service *admission.Service
+	mux     *http.ServeMux
 }
 
 func New(service *admission.Service) *API {
-	a := &API{service: service, mux: http.NewServeMux(), preflightCache: make(map[string]admission.SubmissionPreflight)}
+	a := &API{service: service, mux: http.NewServeMux()}
 	a.routes()
 	return a
 }
