@@ -1,6 +1,7 @@
 package store
 
 import (
+	"log"
 	"path/filepath"
 	"sync"
 	"time"
@@ -54,7 +55,15 @@ func (r *Repository) Commit(tx Transaction) error {
 		eventSeq = tx.Events[n-1].Sequence
 		lastEventDigest = tx.Events[n-1].Digest
 	}
-	return writeSnapshot(r.snapshotPath, Snapshot{SchemaVersion: SchemaVersion, JournalOffset: offset, EventSequence: eventSeq, LastEventDigest: lastEventDigest, StateDigest: digestBytes(tx.State), State: tx.State, SavedAt: tx.CommittedAt})
+	snapshot := Snapshot{SchemaVersion: SchemaVersion, JournalOffset: offset, EventSequence: eventSeq, LastEventDigest: lastEventDigest, StateDigest: digestBytes(tx.State), State: tx.State, SavedAt: tx.CommittedAt}
+	if err := writeSnapshot(r.snapshotPath, snapshot); err != nil {
+		// 事务已成功追加到日志（权威持久化层），快照只是可重建的加速检查点。
+		// 快照刷新失败（如目标被目录占用、权限受限、磁盘只读等）不应回滚已持久化的事务，
+		// 否则会让带幂等键的重放在重开后因键重复而失败；旧快照或缺失快照在 Open/Recover
+		// 时通过重放日志仍可重建一致状态，故仅记录并继续。
+		log.Printf("快照刷新失败，事务已持久化，保留旧快照继续运行: %v", err)
+	}
+	return nil
 }
 
 func (r *Repository) Offset() int64 {
