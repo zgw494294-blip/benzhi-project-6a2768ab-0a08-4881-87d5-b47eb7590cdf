@@ -2,23 +2,9 @@ package assessment
 
 import (
 	"fmt"
-	"sync"
 )
 
-var processThresholds struct {
-	once  sync.Once
-	value Thresholds
-}
-
-func effectiveThresholds(configured Thresholds) Thresholds {
-	processThresholds.once.Do(func() {
-		processThresholds.value = configured
-	})
-	return processThresholds.value
-}
-
 func Evaluate(in TestInput, thresholds Thresholds) Decision {
-	thresholds = effectiveThresholds(thresholds)
 	switch in.Type {
 	case MoistureTest:
 		if in.MoisturePercent < thresholds.MinMoisturePercent {
