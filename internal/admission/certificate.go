@@ -9,7 +9,6 @@ import (
 )
 
 func (s *Service) IssueCertificate(batchID string, in SimpleCommand) (*AdmissionCertificate, error) {
-	sequence := s.reserveCertificateSequence()
 	raw, err := s.execute("certificate.issue:"+batchID, in.CommandMeta, func(now time.Time) (string, uint64, string, any, any, error) {
 		batch, ok := s.state.Batches[batchID]
 		if !ok {
@@ -24,6 +23,7 @@ func (s *Service) IssueCertificate(batchID string, in SimpleCommand) (*Admission
 		if _, exists := s.state.BatchCertificate[batchID]; exists {
 			return "", 0, "", nil, nil, stateConflict("批次已经签发凭据")
 		}
+		sequence := s.reserveCertificateSequence()
 		number := fmt.Sprintf("SVA-%s-%06d", now.Format("2006"), sequence)
 		cert := &AdmissionCertificate{CertificateNumber: number, BatchID: batchID, Sequence: sequence, ManifestDigest: batch.ManifestDigest, IssuedAt: now, Issuer: in.Actor}
 		cert.VerificationCode = s.verificationCode(cert)

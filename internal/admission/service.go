@@ -120,38 +120,46 @@ func (s *Service) execute(operation string, meta CommandMeta, fn mutation) (json
 	if err != nil {
 		return nil, err
 	}
+	sequenceBackup := s.certificateSequence
 	now := s.now()
 	batchID, version, kind, payload, result, err := fn(now)
 	if err != nil {
+		s.certificateSequence = sequenceBackup
 		return nil, err
 	}
 	rawResult, err := json.Marshal(result)
 	if err != nil {
+		s.certificateSequence = sequenceBackup
 		s.restore(backup)
 		return nil, err
 	}
 	event, err := ledger.NewEvent(s.chain.NextSequence(), batchID, version, kind, meta.Actor, now, payload, s.chain.LastDigest())
 	if err != nil {
+		s.certificateSequence = sequenceBackup
 		s.restore(backup)
 		return nil, err
 	}
 	nextChain, err := ledger.NewChain(s.chain.Events())
 	if err != nil {
+		s.certificateSequence = sequenceBackup
 		s.restore(backup)
 		return nil, err
 	}
 	if err = nextChain.Append(event); err != nil {
+		s.certificateSequence = sequenceBackup
 		s.restore(backup)
 		return nil, err
 	}
 	stateRaw, err := json.Marshal(s.state)
 	if err != nil {
+		s.certificateSequence = sequenceBackup
 		s.restore(backup)
 		return nil, err
 	}
 	idem := store.IdempotencyRecord{Key: meta.IdempotencyKey, Operation: operation, Result: rawResult, CreatedAt: now}
 	tx := store.Transaction{Events: []store.EventRecord{event.StoreRecord()}, Idempotency: &idem, CertificateSequence: s.certificateSequence, State: stateRaw}
 	if err = s.repository.Commit(tx); err != nil {
+		s.certificateSequence = sequenceBackup
 		s.restore(backup)
 		return nil, err
 	}
