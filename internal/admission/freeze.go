@@ -49,14 +49,31 @@ func (s *Service) PreviewFreeze(batchID string) (*FreezePreview, error) {
 		return nil, notFound("批次", batchID)
 	}
 	if preview, ok := s.freezePreviews[batchID]; ok && batch.Status == StatusReviewed {
-		return preview, nil
+		return cloneFreezePreview(preview), nil
 	}
 	preview, err := s.buildFreezePreview(batch)
 	if err != nil {
 		return nil, err
 	}
 	s.freezePreviews[batchID] = preview
-	return preview, nil
+	return cloneFreezePreview(preview), nil
+}
+
+func cloneFreezePreview(p *FreezePreview) *FreezePreview {
+	if p == nil {
+		return nil
+	}
+	out := *p
+	out.Manifest = cloneManifest(p.Manifest)
+	out.Summary = p.Summary
+	out.Quality = append([]PacketQualityConclusion(nil), p.Quality...)
+	return &out
+}
+
+func cloneManifest(m assessment.Manifest) assessment.Manifest {
+	out := m
+	out.Packets = append([]assessment.ManifestPacket(nil), m.Packets...)
+	return out
 }
 
 func (s *Service) buildFreezePreview(batch *AdmissionBatch) (*FreezePreview, error) {
@@ -105,12 +122,19 @@ func (s *Service) FreezeBatch(batchID string, in FreezeInput) (*AdmissionBatch, 
 			}
 			s.freezePreviews[batchID] = preview
 		}
-		if strings.TrimSpace(in.PreviewDigest) == "" || in.PreviewDigest != preview.Digest {
-			return "", 0, "", nil, nil, stateConflict("冻结清单摘要不一致，请重新预览")
-		}
-		digest, rawManifest, err := assessment.ManifestDigest(preview.Manifest)
+		manifest, err := s.buildManifest(batch)
 		if err != nil {
 			return "", 0, "", nil, nil, err
+		}
+		digest, rawManifest, err := assessment.ManifestDigest(manifest)
+		if err != nil {
+			return "", 0, "", nil, nil, err
+		}
+		if strings.TrimSpace(in.PreviewDigest) == "" || in.PreviewDigest != digest {
+			return "", 0, "", nil, nil, stateConflict("冻结清单摘要不一致，请重新预览")
+		}
+		if preview.Digest != digest {
+			return "", 0, "", nil, nil, stateConflict("冻结清单摘要不一致，请重新预览")
 		}
 		at := now
 		batch.Manifest = json.RawMessage(rawManifest)
