@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-func (s *Service) CreateBatch(in CreateBatchInput) (*AdmissionBatch, error) {
-	raw, err := s.execute("batch.create", in.CommandMeta, func(now time.Time) (string, uint64, string, any, any, error) {
+func (s *Service) createBatchMutation(in CreateBatchInput) mutation {
+	return func(now time.Time) (string, uint64, string, any, any, error) {
 		if in.ExpectedVersion != 0 {
 			return "", 0, "", nil, nil, versionConflict(in.ExpectedVersion, 0)
 		}
@@ -18,7 +18,11 @@ func (s *Service) CreateBatch(in CreateBatchInput) (*AdmissionBatch, error) {
 		batch := &AdmissionBatch{ID: id, SpeciesName: strings.TrimSpace(in.SpeciesName), CollectionSite: strings.TrimSpace(in.CollectionSite), CollectedAt: in.CollectedAt.UTC(), PermitDigest: strings.TrimSpace(in.PermitDigest), Owner: strings.TrimSpace(in.Owner), Status: StatusDraft, Version: 1, CreatedAt: now, UpdatedAt: now}
 		s.state.Batches[id] = batch
 		return id, batch.Version, "batch.created", map[string]any{"status": batch.Status}, batch, nil
-	})
+	}
+}
+
+func (s *Service) CreateBatch(in CreateBatchInput) (*AdmissionBatch, error) {
+	raw, err := s.execute("batch.create", in.CommandMeta, s.createBatchMutation(in))
 	return decodeResult[*AdmissionBatch](raw, err)
 }
 
@@ -26,7 +30,8 @@ func (s *Service) CreateBatchContext(ctx context.Context, in CreateBatchInput) (
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	return s.CreateBatch(in)
+	raw, err := s.executeWithContext(ctx, "batch.create", in.CommandMeta, s.createBatchMutation(in))
+	return decodeResult[*AdmissionBatch](raw, err)
 }
 
 func (s *Service) AddPacket(batchID string, in AddPacketInput) (*SeedPacket, error) {

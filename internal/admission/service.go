@@ -1,6 +1,7 @@
 package admission
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -105,11 +106,24 @@ func validateMeta(meta CommandMeta) error {
 type mutation func(time.Time) (batchID string, version uint64, kind string, payload any, result any, err error)
 
 func (s *Service) execute(operation string, meta CommandMeta, fn mutation) (json.RawMessage, error) {
+	return s.executeWithContext(context.Background(), operation, meta, fn)
+}
+
+func (s *Service) executeWithContext(ctx context.Context, operation string, meta CommandMeta, fn mutation) (json.RawMessage, error) {
 	if err := validateMeta(meta); err != nil {
 		return nil, err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	// Re-check the request context after acquiring the write lock. A request may
+	// pass the entry validation, then block here while a prior creation holds the
+	// service lock. If the client cancels while waiting, the creation must abort
+	// without persisting a batch, audit event, or idempotency record, so that a
+	// later retry with the same idempotencyKey re-runs payload validation instead
+	// of returning the cancelled request's result.
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if prior, ok := s.idempotency[meta.IdempotencyKey]; ok {
 		if prior.Operation != operation {
 			return nil, idempotencyConflict()
