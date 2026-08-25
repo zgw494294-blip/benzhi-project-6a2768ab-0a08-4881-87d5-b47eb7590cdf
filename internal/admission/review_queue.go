@@ -155,21 +155,14 @@ func (s *Service) SearchReviewQueue(query ReviewQueueQuery) (*ReviewQueueResult,
 	}
 	start := 0
 	if query.Cursor != "" {
-		batchID, err := decodeQueueCursor(query.Cursor, query)
+		offset, err := decodeQueueCursor(query.Cursor, query)
 		if err != nil {
 			return nil, invalid("cursor 无效")
 		}
-		found := false
-		for index := range items {
-			if items[index].Batch.ID == batchID {
-				start = index + 1
-				found = true
-				break
-			}
-		}
-		if !found {
+		if offset > len(items) {
 			return nil, invalid("cursor 无效或已不属于当前筛选结果")
 		}
+		start = offset
 	}
 	end := start + query.PageSize
 	if end > len(items) {
@@ -177,7 +170,7 @@ func (s *Service) SearchReviewQueue(query ReviewQueueQuery) (*ReviewQueueResult,
 	}
 	result.Items = append([]ReviewQueueItem(nil), items[start:end]...)
 	if end < len(items) && end > start {
-		result.NextCursor = encodeQueueCursor(items[end-1].Batch.ID, query)
+		result.NextCursor = encodeQueueCursor(end, query)
 	}
 	return result, nil
 }
@@ -208,7 +201,7 @@ func queueLess(a, b ReviewQueueItem, sortBy string) bool {
 
 type reviewQueueCursor struct {
 	Version   int    `json:"version"`
-	BatchID   string `json:"batchId"`
+	Offset    int    `json:"offset"`
 	Signature string `json:"signature"`
 }
 
@@ -217,27 +210,27 @@ func queueSignature(query ReviewQueueQuery) string {
 	return strings.Join(values, "\x00")
 }
 
-func encodeQueueCursor(batchID string, query ReviewQueueQuery) string {
-	raw, _ := json.Marshal(reviewQueueCursor{Version: 1, BatchID: batchID, Signature: queueSignature(query)})
+func encodeQueueCursor(offset int, query ReviewQueueQuery) string {
+	raw, _ := json.Marshal(reviewQueueCursor{Version: 1, Offset: offset, Signature: queueSignature(query)})
 	return base64.RawURLEncoding.EncodeToString(raw)
 }
 
-func decodeQueueCursor(cursor string, query ReviewQueueQuery) (string, error) {
+func decodeQueueCursor(cursor string, query ReviewQueueQuery) (int, error) {
 	raw, err := base64.RawURLEncoding.DecodeString(cursor)
 	if err != nil {
-		return "", err
+		return 0, err
 	}
 	var value reviewQueueCursor
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&value); err != nil {
-		return "", err
+		return 0, err
 	}
 	if err := decoder.Decode(&struct{}{}); err != io.EOF {
-		return "", invalid("cursor 无效")
+		return 0, invalid("cursor 无效")
 	}
-	if value.Version != 1 || strings.TrimSpace(value.BatchID) == "" || value.Signature != queueSignature(query) {
-		return "", invalid("cursor 无效")
+	if value.Version != 1 || value.Offset < 1 || value.Signature != queueSignature(query) {
+		return 0, invalid("cursor 无效")
 	}
-	return value.BatchID, nil
+	return value.Offset, nil
 }
