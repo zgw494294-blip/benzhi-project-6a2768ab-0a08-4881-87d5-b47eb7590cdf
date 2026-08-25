@@ -37,7 +37,7 @@ func (s *Service) GetBatch(batchID string) (*BatchDetail, error) {
 	}
 	for _, issue := range s.state.Issues {
 		if issue.BatchID == batchID {
-			detail.Issues = append(detail.Issues, clone(issue))
+			detail.Issues = append(detail.Issues, cloneIssueForProjection(issue))
 		}
 	}
 	if number := s.state.BatchCertificate[batchID]; number != "" {
@@ -134,5 +134,13 @@ func clone[T any](value *T) *T {
 	b, _ := json.Marshal(value)
 	var out T
 	_ = json.Unmarshal(b, &out)
+	return &out
+}
+
+func cloneIssueForProjection(value *AdmissionIssue) *AdmissionIssue {
+	if value == nil {
+		return nil
+	}
+	out := *value
 	return &out
 }
