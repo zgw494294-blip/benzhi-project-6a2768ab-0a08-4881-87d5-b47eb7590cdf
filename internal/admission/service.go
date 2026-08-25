@@ -30,6 +30,7 @@ type Service struct {
 	chain               *ledger.Chain
 	state               persistedState
 	idempotency         map[string]store.IdempotencyRecord
+	freezePreviews      map[string]*FreezePreview
 	certificateSequence uint64
 	thresholds          assessment.Thresholds
 	now                 func() time.Time
@@ -48,7 +49,7 @@ func Open(dataDir string, thresholds assessment.Thresholds, secret string) (*Ser
 	if err != nil {
 		return nil, err
 	}
-	s := &Service{repository: repo, chain: recovered.Chain, idempotency: recovered.Idempotency, certificateSequence: recovered.CertificateSequence, thresholds: thresholds, now: func() time.Time { return time.Now().UTC() }, verificationSecret: secret}
+	s := &Service{repository: repo, chain: recovered.Chain, idempotency: recovered.Idempotency, freezePreviews: make(map[string]*FreezePreview), certificateSequence: recovered.CertificateSequence, thresholds: thresholds, now: func() time.Time { return time.Now().UTC() }, verificationSecret: secret}
 	s.state = newState()
 	if len(recovered.LatestState) > 0 {
 		if err := json.Unmarshal(recovered.LatestState, &s.state); err != nil {

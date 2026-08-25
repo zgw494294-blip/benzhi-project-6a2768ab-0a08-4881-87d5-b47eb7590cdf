@@ -48,7 +48,15 @@ func (s *Service) PreviewFreeze(batchID string) (*FreezePreview, error) {
 	if !ok {
 		return nil, notFound("批次", batchID)
 	}
-	return s.buildFreezePreview(batch)
+	if preview, ok := s.freezePreviews[batchID]; ok && batch.Status == StatusReviewed {
+		return preview, nil
+	}
+	preview, err := s.buildFreezePreview(batch)
+	if err != nil {
+		return nil, err
+	}
+	s.freezePreviews[batchID] = preview
+	return preview, nil
 }
 
 func (s *Service) buildFreezePreview(batch *AdmissionBatch) (*FreezePreview, error) {
@@ -88,9 +96,14 @@ func (s *Service) FreezeBatch(batchID string, in FreezeInput) (*AdmissionBatch, 
 		if in.BatchVersion != batch.Version {
 			return "", 0, "", nil, nil, stateConflict("冻结确认的 batchVersion 已变化，请重新预览")
 		}
-		preview, err := s.buildFreezePreview(batch)
-		if err != nil {
-			return "", 0, "", nil, nil, err
+		preview, ok := s.freezePreviews[batchID]
+		if !ok {
+			var err error
+			preview, err = s.buildFreezePreview(batch)
+			if err != nil {
+				return "", 0, "", nil, nil, err
+			}
+			s.freezePreviews[batchID] = preview
 		}
 		if strings.TrimSpace(in.PreviewDigest) == "" || in.PreviewDigest != preview.Digest {
 			return "", 0, "", nil, nil, stateConflict("冻结清单摘要不一致，请重新预览")
