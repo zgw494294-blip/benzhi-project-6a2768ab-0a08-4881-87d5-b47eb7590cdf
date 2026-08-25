@@ -9,6 +9,7 @@ import (
 )
 
 func (s *Service) IssueCertificate(batchID string, in SimpleCommand) (*AdmissionCertificate, error) {
+	sequence := s.reserveCertificateSequence()
 	raw, err := s.execute("certificate.issue:"+batchID, in.CommandMeta, func(now time.Time) (string, uint64, string, any, any, error) {
 		batch, ok := s.state.Batches[batchID]
 		if !ok {
@@ -23,9 +24,8 @@ func (s *Service) IssueCertificate(batchID string, in SimpleCommand) (*Admission
 		if _, exists := s.state.BatchCertificate[batchID]; exists {
 			return "", 0, "", nil, nil, stateConflict("批次已经签发凭据")
 		}
-		s.certificateSequence++
-		number := fmt.Sprintf("SVA-%s-%06d", now.Format("2006"), s.certificateSequence)
-		cert := &AdmissionCertificate{CertificateNumber: number, BatchID: batchID, Sequence: s.certificateSequence, ManifestDigest: batch.ManifestDigest, IssuedAt: now, Issuer: in.Actor}
+		number := fmt.Sprintf("SVA-%s-%06d", now.Format("2006"), sequence)
+		cert := &AdmissionCertificate{CertificateNumber: number, BatchID: batchID, Sequence: sequence, ManifestDigest: batch.ManifestDigest, IssuedAt: now, Issuer: in.Actor}
 		cert.VerificationCode = s.verificationCode(cert)
 		s.state.Certificates[number] = cert
 		s.state.BatchCertificate[batchID] = number
@@ -37,6 +37,11 @@ func (s *Service) IssueCertificate(batchID string, in SimpleCommand) (*Admission
 		return batchID, batch.Version, "certificate.issued", map[string]any{"certificateNumber": number, "manifestDigest": cert.ManifestDigest}, cert, nil
 	})
 	return decodeResult[*AdmissionCertificate](raw, err)
+}
+
+func (s *Service) reserveCertificateSequence() uint64 {
+	s.certificateSequence++
+	return s.certificateSequence
 }
 
 func (s *Service) verificationCode(cert *AdmissionCertificate) string {
