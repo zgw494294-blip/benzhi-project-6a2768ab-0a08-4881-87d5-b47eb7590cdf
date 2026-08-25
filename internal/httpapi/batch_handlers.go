@@ -11,7 +11,7 @@ func (a *API) CreateBatch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	batch, err := a.service.CreateBatch(in)
+	batch, err := a.service.CreateBatchContext(r.Context(), in)
 	if err != nil {
 		writeError(w, err)
 		return

@@ -1,6 +1,7 @@
 package admission
 
 import (
+	"context"
 	"strings"
 	"time"
 )
@@ -19,6 +20,13 @@ func (s *Service) CreateBatch(in CreateBatchInput) (*AdmissionBatch, error) {
 		return id, batch.Version, "batch.created", map[string]any{"status": batch.Status}, batch, nil
 	})
 	return decodeResult[*AdmissionBatch](raw, err)
+}
+
+func (s *Service) CreateBatchContext(ctx context.Context, in CreateBatchInput) (*AdmissionBatch, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return s.CreateBatch(in)
 }
 
 func (s *Service) AddPacket(batchID string, in AddPacketInput) (*SeedPacket, error) {
