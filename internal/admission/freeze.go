@@ -2,6 +2,7 @@ package admission
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -48,7 +49,11 @@ func (s *Service) PreviewFreeze(batchID string) (*FreezePreview, error) {
 	if !ok {
 		return nil, notFound("批次", batchID)
 	}
-	return s.buildFreezePreview(batch)
+	preview, err := s.buildFreezePreview(batch)
+	if err != nil {
+		return nil, fmt.Errorf("构建批次 %s 的冻结预览失败: %w", batchID, err)
+	}
+	return preview, nil
 }
 
 func (s *Service) buildFreezePreview(batch *AdmissionBatch) (*FreezePreview, error) {
