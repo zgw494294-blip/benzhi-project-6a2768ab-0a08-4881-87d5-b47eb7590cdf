@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="古树种子迁地保育材料入藏评审工作台">
+  <title>种藏准入台</title>
+  <link rel="stylesheet" href="/assets/style.css">
+  <link rel="stylesheet" href="/assets/workbench.css">
+</head>
+<body>
+  <header class="masthead"><div><p class="eyebrow">SEED VAULT / ADMISSION</p><h1>种藏准入台</h1></div><p>将一批材料从来源草拟推进到冻结清单与入藏签证。</p></header>
+  <main>
+    <section class="card intro"><div><h2>新建评审批次</h2><p>提交后来源字段锁定。每次写入都携带当前 version 和唯一操作键。</p></div>
+      <form id="create-form" class="grid-form">
+        <label>物种名称<input name="speciesName" required maxlength="200" placeholder="银杏"></label>
+        <label>采集地点<input name="collectionSite" required maxlength="200" placeholder="浙江天目山样地 A"></label>
+        <label>采集日期<input name="collectedAt" type="datetime-local" required></label>
+        <label>采集许可摘要<input name="permitDigest" required maxlength="200" placeholder="许可编号及范围摘要"></label>
+        <label>责任人<input name="owner" required maxlength="200"></label>
+        <label>当前操作者<input name="actor" required maxlength="80"></label>
+        <button type="submit">创建草拟批次</button>
+      </form>
+    </section>
+    <section class="card lookup"><h2>打开批次</h2><form id="lookup-form"><input id="lookup-id" required placeholder="batch_…"><button>载入</button></form></section>
+    <section class="card"><div class="section-head"><div><h2>待复核队列</h2><p id="queue-stats">正在载入待办统计…</p></div></div>
+      <form id="queue-form" class="grid-form compact"><label>物种名称<input name="speciesName"></label><label>责任人<input name="owner"></label><label>严重级别<select name="severity"><option value="">全部</option><option value="serious">严重</option></select></label><label>问题状态<select name="issueStatus"><option value="">全部</option><option value="pending_review">待复核</option><option value="returned">已退回</option><option value="open">待整改</option><option value="closed">已关闭</option></select></label><label>排序<select name="sort"><option value="earliestPendingAt">最早待复核时间</option><option value="unclosedSeriousCount">未关闭严重问题数</option><option value="updatedAt">批次更新时间</option></select></label><label>每页数量<input name="pageSize" type="number" min="1" max="100" value="20"></label><button>检索</button></form>
+      <div id="queue-list" class="stack"></div><button id="queue-next" class="secondary" disabled>下一页</button>
+    </section>
+    <section id="workspace" class="hidden">
+      <div class="statusbar"><div><p class="eyebrow">CURRENT BATCH</p><h2 id="batch-title"></h2></div><div class="pill" id="batch-status"></div></div>
+      <nav class="steps"><span>1 来源</span><span>2 分装</span><span>3 试验</span><span>4 整改复核</span><span>5 冻结签发</span></nav>
+      <section class="card"><div class="section-head"><div><h3>采集来源</h3><p>草拟阶段可修订；提交后永久锁定。</p></div><div id="preflight"></div></div>
+        <form id="source-form" class="grid-form"><label>物种名称<input name="speciesName" required maxlength="200"></label><label>采集地点<input name="collectionSite" required maxlength="200"></label><label>采集日期<input name="collectedAt" type="datetime-local" required></label><label>采集许可摘要<input name="permitDigest" required maxlength="200"></label><label>责任人<input name="owner" required maxlength="200"></label><label>操作者<input name="actor" required maxlength="80"></label><button>保存来源修订</button></form>
+      </section>
+      <div class="columns">
+        <section class="card"><div class="section-head"><h3>分装单元</h3><strong id="packet-summary"></strong></div><div id="packet-list" class="stack"></div>
+          <form id="packet-form" class="grid-form compact"><label>容器标识<input name="containerCode" required></label><label>种子数量<input name="seedCount" type="number" min="1" required></label><label>净重（克）<input name="netWeightGrams" type="number" min="0.01" step="0.01" required></label><label>初始含水率（%）<input name="initialMoisturePercent" type="number" min="0" max="100" step="0.01" required></label><label class="wide">来源备注<input name="sourceNote" maxlength="500"></label><button>登记分装</button></form>
+          <button id="submit-batch" class="secondary">锁定来源并提交评估</button>
+        </section>
+        <section class="card"><h3>质量试验</h3><div id="assessment-list" class="stack"></div>
+          <form id="test-form" class="grid-form compact"><label>分装单元<select name="packetId" required></select></label><label>类型<select name="assessmentType"><option value="moisture">含水率复测</option><option value="germination">萌发试验</option></select></label><label>含水率（%）<input name="moisturePercent" type="number" step="0.01" value="0"></label><label>样本数<input name="sampleSize" type="number" min="0" value="0"></label><label>萌发数<input name="germinatedCount" type="number" min="0" value="0"></label><label>执行人<input name="operator" required></label><label class="wide">自动替代当前有效试验 ID<input name="supersedesId" readonly placeholder="首次试验无需替代"></label><button>记录试验</button></form>
+        </section>
+      </div>
+      <section class="card"><div class="section-head"><div><h3>问题与独立复核</h3><p>可勾选多个问题，分别填写说明与有效复测后原子提交。</p></div><div class="actions"><button id="batch-remediation">批量提交整改</button><button id="review-batch">批准复核</button></div></div><div id="issue-list" class="stack"></div></section>
+      <section class="card final"><div><h3>冻结与签发</h3><p id="digest">清单尚未冻结。</p><div id="freeze-preview"></div></div><div class="actions"><button id="preview-freeze">预览冻结清单</button><button id="freeze-batch">确认摘要并冻结</button><button id="issue-certificate">签发入藏凭据</button></div><div id="certificate"></div></section>
+    </section>
+    <aside id="notice" role="status" aria-live="polite"></aside>
+  </main>
+  <script src="/assets/app.js" defer></script>
+</body>
+</html>
