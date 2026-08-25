@@ -1,6 +1,7 @@
 package store
 
 import (
+	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -12,6 +13,7 @@ type Repository struct {
 	journalPath  string
 	snapshotPath string
 	offset       int64
+	journal      *os.File
 }
 
 func Open(dir string) (*Repository, []Transaction, *Snapshot, error) {
@@ -43,7 +45,7 @@ func (r *Repository) Commit(tx Transaction) error {
 	if tx.CommittedAt.IsZero() {
 		tx.CommittedAt = time.Now().UTC()
 	}
-	offset, err := appendTransaction(r.journalPath, tx)
+	offset, err := r.appendTransaction(tx)
 	if err != nil {
 		return err
 	}
@@ -55,6 +57,17 @@ func (r *Repository) Commit(tx Transaction) error {
 		lastEventDigest = tx.Events[n-1].Digest
 	}
 	return writeSnapshot(r.snapshotPath, Snapshot{SchemaVersion: SchemaVersion, JournalOffset: offset, EventSequence: eventSeq, LastEventDigest: lastEventDigest, StateDigest: digestBytes(tx.State), State: tx.State, SavedAt: tx.CommittedAt})
+}
+
+func (r *Repository) appendTransaction(tx Transaction) (int64, error) {
+	if r.journal == nil {
+		journal, err := os.OpenFile(r.journalPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+		if err != nil {
+			return 0, err
+		}
+		r.journal = journal
+	}
+	return appendTransactionFile(r.journal, tx)
 }
 
 func (r *Repository) Offset() int64 {

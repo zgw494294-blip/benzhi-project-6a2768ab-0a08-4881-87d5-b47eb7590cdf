@@ -10,6 +10,15 @@ import (
 )
 
 func appendTransaction(path string, tx Transaction) (int64, error) {
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	if err != nil {
+		return 0, err
+	}
+	defer f.Close()
+	return appendTransactionFile(f, tx)
+}
+
+func appendTransactionFile(f *os.File, tx Transaction) (int64, error) {
 	payload, err := json.Marshal(tx)
 	if err != nil {
 		return 0, err
@@ -18,11 +27,6 @@ func appendTransaction(path string, tx Transaction) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
-	if err != nil {
-		return 0, err
-	}
-	defer f.Close()
 	if _, err = f.Write(record); err != nil {
 		return 0, err
 	}
